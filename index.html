@@ -111,6 +111,33 @@
     .collection-meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
     .collection-chip { padding:6px 9px; border-radius:999px; background:#f0f4f8; color:#486581; font-size:.7rem; font-weight:800; }
     .collection-progress { margin-top:16px; color:var(--teal-dark); font-size:.75rem; font-weight:800; }
+    .flashcard-library-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .flashcard-deck-card { min-height:180px; }
+    .flashcard-study { max-width:900px; margin:0 auto; }
+    .flashcard-stage { perspective:1200px; margin-top:18px; }
+    .flashcard { position:relative; width:100%; min-height:380px; border:0; padding:0; color:inherit; background:transparent; text-align:left; transform-style:preserve-3d; transition:transform .45s ease; }
+    .flashcard.flipped { transform:rotateY(180deg); }
+    .flashcard-face { position:absolute; inset:0; padding:clamp(24px,5vw,48px); border:1px solid var(--line); border-radius:24px; background:white; box-shadow:var(--shadow); backface-visibility:hidden; display:flex; flex-direction:column; justify-content:center; overflow:auto; }
+    .flashcard-back { transform:rotateY(180deg); background:linear-gradient(145deg,#102a43,#173f5f); color:white; }
+    .flashcard-label { color:var(--teal); font-size:.75rem; font-weight:850; letter-spacing:.09em; text-transform:uppercase; }
+    .flashcard-back .flashcard-label { color:#8de0d5; }
+    .flashcard-face h2 { margin:12px 0; font-size:clamp(1.35rem,3vw,2rem); line-height:1.35; letter-spacing:-.03em; }
+    .flashcard-answer { margin:12px 0; color:#fff; font-size:clamp(1.2rem,2.7vw,1.75rem); font-weight:850; }
+    .flashcard-explanation { margin:8px 0 0; color:#d9e2ec; line-height:1.65; }
+    .flashcard-source { margin-top:18px; color:#9fb3c8; font-size:.78rem; }
+    .flashcard-hint { margin-top:auto; padding-top:20px; color:var(--muted); font-size:.78rem; text-align:center; }
+    .flashcard-back .flashcard-hint { color:#bcccdc; }
+    .flashcard-face .figure-box { max-height:230px; overflow:hidden; }
+    .flashcard-controls { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center; margin-top:18px; }
+    .flashcard-controls .review-again { justify-self:start; color:#a23c3c; border-color:#efb7b7; }
+    .flashcard-controls .know-card { justify-self:end; background:var(--teal); }
+    .flashcard-progress-summary { display:flex; flex-wrap:wrap; gap:9px; margin-top:16px; }
+    .flashcard-progress-summary span { padding:6px 10px; border-radius:999px; background:#edf2f7; color:#486581; font-size:.74rem; font-weight:800; }
+    .flashcard-progress-summary .known { background:var(--teal-soft); color:#166d62; }
+    .flashcard-complete { padding:48px 28px; text-align:center; }
+    .flashcard-complete h2 { margin:0 0 8px; }
+    .flashcard-complete p { color:var(--muted); }
+    .flashcard-complete-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:10px; margin-top:22px; }
     .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .72fr); gap: 22px; }
     .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
     .panel-pad { padding: clamp(20px, 3vw, 28px); }
@@ -227,6 +254,7 @@
     .primary-button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
     .secondary-button { padding: 11px 17px; color: var(--ink); background: white; border: 1px solid var(--line); }
     .secondary-button:hover { background: var(--soft); }
+    .secondary-button:disabled { opacity:.42; cursor:not-allowed; }
     .ghost-button { padding: 9px 12px; color: var(--muted); background: transparent; }
     .ghost-button:hover { color: var(--ink); background: var(--soft); }
 
@@ -257,7 +285,7 @@
       .nav { margin-left: auto; display: flex; }
       .nav-button { width: auto; padding: 10px; }
       .nav-button span { display: none; }
-      .dashboard-grid, .collection-grid { grid-template-columns: 1fr; }
+      .dashboard-grid, .collection-grid, .flashcard-library-grid { grid-template-columns: 1fr; }
       .review-card { grid-column: auto; }
     }
     @media (max-width: 640px) {
@@ -280,6 +308,10 @@
       .history-item { grid-template-columns: 1fr auto; gap: 10px; }
       .history-answers { grid-column: 1 / -1; text-align: left; }
       .collection-card { grid-template-columns: 1fr; min-height:0; }
+      .flashcard { min-height:430px; }
+      .flashcard-controls { grid-template-columns:1fr 1fr; }
+      .flashcard-controls #flip-card { grid-column:1 / -1; grid-row:1; }
+      .flashcard-controls .review-again, .flashcard-controls .know-card { width:100%; justify-self:stretch; }
       .view-heading { align-items: flex-start; flex-direction: column; }
     }
   </style>
@@ -299,6 +331,9 @@
         </button>
         <button class="nav-button" data-view="dashboard">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Exam dashboard</span>
+        </button>
+        <button class="nav-button" data-view="flashcards">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="14" height="14" rx="2"/><path d="m8 5 2-3h10v13l-2 2M8 10h6M8 14h4"/></svg><span>Flashcards</span>
         </button>
         <button class="nav-button" data-view="history">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Results history</span>
@@ -324,6 +359,27 @@
             <p class="section-copy">Every collection keeps its own Easy, Medium, Hard, history, and Mistake Review progress. The Study Guide collection is limited to the teacher-provided exam objectives.</p>
           </div>
           <div class="collection-grid" id="collection-grid"></div>
+        </section>
+
+        <section class="view" id="view-flashcards" hidden>
+          <div class="library-hero">
+            <p class="section-kicker">Flashcard library</p>
+            <h2 class="section-title">Review every lesson at your own pace.</h2>
+            <p class="section-copy">Choose a lesson pair or combine all six lessons. Flip each card to reveal the answer, explanation, and source. Flashcard progress is saved separately from exam results.</p>
+          </div>
+          <div class="flashcard-library-grid" id="flashcard-deck-grid"></div>
+        </section>
+
+        <section class="view flashcard-study" id="view-flashcard-study" hidden>
+          <div class="exam-toolbar"><div class="exam-level"><span class="level-dot"></span><span id="flashcard-deck-label">Lessons 01–02</span></div><div class="question-count" id="flashcard-count">Card 1 of 78</div></div>
+          <div class="exam-progress"><span id="flashcard-progress-bar"></span></div>
+          <div class="flashcard-progress-summary" id="flashcard-progress-summary"></div>
+          <div class="flashcard-stage" id="flashcard-stage"></div>
+          <div class="flashcard-controls" id="flashcard-controls">
+            <button class="secondary-button review-again" id="review-flashcard">Review again</button>
+            <button class="primary-button" id="flip-card">Show answer</button>
+            <button class="primary-button know-card" id="know-flashcard">I know this</button>
+          </div>
         </section>
 
         <section class="view" id="view-dashboard" hidden>

@@ -2,6 +2,7 @@
   'use strict';
 
   const STORAGE_PREFIX = 'microlab-exam-v3-';
+  const FLASHCARD_STORAGE_PREFIX = 'microlab-flashcards-v1-';
   const banks = window.MICROLAB_BANKS;
   const levels = {
     easy: { label:'Easy', code:'01', note:'Core facts & recognition' },
@@ -18,7 +19,18 @@
   let questions = [];
   let state = null;
   let activeExam = null;
+  let currentFlashDeck = null;
+  let flashState = null;
+  let flashcardFlipped = false;
   let toastTimer = null;
+
+  const flashcardDecks = {
+    lessons12:{ id:'lessons12', title:'Lessons 01 & 02', shortTitle:'Lessons 01–02', code:'01–02', accent:'teal', description:'Safety, scientific method, microbial ubiquity, colony morphology, and hand hygiene.', questions:banks.lessons12.questions },
+    lessons34:{ id:'lessons34', title:'Lessons 03 & 04', shortTitle:'Lessons 03–04', code:'03–04', accent:'blue', description:'Microscopy, cell morphology, aseptic transfer, culture media, and pure-culture isolation.', questions:banks.lessons34.questions },
+    lessons56:{ id:'lessons56', title:'Lessons 05 & 06', shortTitle:'Lessons 05–06', code:'05–06', accent:'orange', description:'Smear preparation, staining, specialized bacterial structures, flagella, and motility.', questions:banks.lessons56.questions },
+    studyGuide:{ id:'studyGuide', title:'Study Guide Lab Exam 1', shortTitle:'Study Guide', code:'GUIDE', accent:'purple', description:'Flashcards limited to the objectives in the teacher-provided Study Guide Lab Exam 1.', questions:banks.studyGuide.questions },
+    allLessons:{ id:'allLessons', title:'All Lessons 01–06', shortTitle:'All Lessons 01–06', code:'01–06', accent:'navy', description:'A complete flashcard deck combining the source-mapped banks from all six laboratory modules.', questions:[...banks.lessons12.questions, ...banks.lessons34.questions, ...banks.lessons56.questions] }
+  };
 
   function initialState(){
     return { version:3, history:[], mistakes:[], drafts:{}, completed:{ easy:false, medium:false, hard:false } };
@@ -36,6 +48,25 @@
     } catch { return initialState(); }
   }
   function saveState(){ if (currentBank && state) localStorage.setItem(storageKey(currentBank.id), JSON.stringify(state)); }
+  function initialFlashState(deck){ return { version:1, known:[], review:[], index:0, order:deck.questions.map(question => question.id) }; }
+  function flashStorageKey(id){ return `${FLASHCARD_STORAGE_PREFIX}${id}`; }
+  function loadFlashState(deck){
+    try {
+      const parsed = JSON.parse(localStorage.getItem(flashStorageKey(deck.id)));
+      if (!parsed || parsed.version !== 1) return initialFlashState(deck);
+      const validIds = new Set(deck.questions.map(question => question.id));
+      const savedOrder = Array.isArray(parsed.order) ? parsed.order.filter(id => validIds.has(id)) : [];
+      const missing = deck.questions.map(question => question.id).filter(id => !savedOrder.includes(id));
+      return {
+        version:1,
+        known:Array.isArray(parsed.known) ? parsed.known.filter(id => validIds.has(id)) : [],
+        review:Array.isArray(parsed.review) ? parsed.review.filter(id => validIds.has(id)) : [],
+        index:Number.isInteger(parsed.index) ? Math.max(0, parsed.index) : 0,
+        order:[...savedOrder, ...missing]
+      };
+    } catch { return initialFlashState(deck); }
+  }
+  function saveFlashState(){ if (currentFlashDeck && flashState) localStorage.setItem(flashStorageKey(currentFlashDeck.id), JSON.stringify(flashState)); }
   function escapeHTML(value){ return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char])); }
   function normalize(value){ return String(value).toLowerCase().trim().replace(/[–—]/g,'-').replace(/\s+/g,' ').replace(/[^a-z0-9×^⁻. -]/g,''); }
   function isCorrect(question, response){
@@ -65,6 +96,109 @@
     }).join('');
   }
 
+  function renderFlashcardLibrary(){
+    document.getElementById('flashcard-deck-grid').innerHTML = Object.values(flashcardDecks).map(deck => {
+      const saved = loadFlashState(deck);
+      const known = new Set(saved.known).size;
+      const remaining = Math.max(0, saved.order.length - Math.min(saved.index, saved.order.length));
+      const [color, soft] = colors[deck.accent] || colors.teal;
+      return `<button class="panel collection-card flashcard-deck-card" data-select-flash-deck="${deck.id}" style="--collection-color:${color};--collection-soft:${soft}">
+        <span class="collection-code">${escapeHTML(deck.code)}</span>
+        <span class="collection-copy"><h3>${escapeHTML(deck.title)}</h3><p>${escapeHTML(deck.description)}</p>
+          <span class="collection-meta"><span class="collection-chip">${deck.questions.length} cards</span><span class="collection-chip">${known} known</span></span>
+          <span class="collection-progress">${remaining ? `${remaining} cards remaining` : 'Deck completed · ready to study again'}</span>
+        </span>
+      </button>`;
+    }).join('');
+  }
+
+  function selectFlashDeck(id){
+    const deck = flashcardDecks[id];
+    if (!deck) return;
+    persistDraft();
+    currentFlashDeck = deck;
+    flashState = loadFlashState(deck);
+    flashcardFlipped = false;
+    showView('flashcard-study');
+  }
+
+  function currentFlashcard(){
+    if (!currentFlashDeck || !flashState) return null;
+    const id = flashState.order[flashState.index];
+    return currentFlashDeck.questions.find(question => question.id === id) || null;
+  }
+
+  function flashcardAnswer(question){
+    if (question.type === 'mcq') return question.answer;
+    return question.displayAnswer || question.answers?.[0] || 'See the explanation.';
+  }
+
+  function renderFlashcard(){
+    if (!currentFlashDeck || !flashState) return;
+    const total = flashState.order.length;
+    const knownCount = new Set(flashState.known).size;
+    const reviewCount = new Set(flashState.review).size;
+    const position = Math.min(flashState.index + 1, total);
+    document.getElementById('flashcard-deck-label').textContent = currentFlashDeck.shortTitle;
+    document.getElementById('flashcard-count').textContent = flashState.index >= total ? `${total} cards reviewed` : `Card ${position} of ${total}`;
+    document.getElementById('flashcard-progress-bar').style.width = `${total ? Math.min(flashState.index, total) / total * 100 : 0}%`;
+    document.getElementById('flashcard-progress-summary').innerHTML = `<span>${total} total</span><span class="known">${knownCount} known</span><span>${reviewCount} marked for review</span>`;
+
+    const stage = document.getElementById('flashcard-stage');
+    const controls = document.getElementById('flashcard-controls');
+    const question = currentFlashcard();
+    if (!question) {
+      controls.hidden = true;
+      stage.innerHTML = `<div class="panel flashcard-complete"><p class="section-kicker">Deck complete</p><h2>You reviewed all ${total} cards.</h2><p>${knownCount} marked as known · ${reviewCount} marked for another review.</p><div class="flashcard-complete-actions"><button class="secondary-button" data-flash-action="library">Choose another deck</button>${reviewCount ? '<button class="secondary-button" data-flash-action="review">Review marked cards</button>' : ''}<button class="primary-button" data-flash-action="again">Study this deck again</button></div></div>`;
+      return;
+    }
+
+    controls.hidden = false;
+    flashcardFlipped = false;
+    const typeLabel = question.type === 'mcq' ? 'Multiple choice concept' : question.figure ? 'Figure-based concept' : 'Short-answer concept';
+    stage.innerHTML = `<button class="flashcard" id="active-flashcard" aria-label="Flip flashcard to reveal answer" aria-pressed="false">
+      <span class="flashcard-face flashcard-front"><span class="flashcard-label">${escapeHTML(typeLabel)} · ${escapeHTML(question.topic)}</span><h2>${escapeHTML(question.prompt)}</h2>${question.figure || ''}<span class="flashcard-hint">Click the card or press “Show answer”</span></span>
+      <span class="flashcard-face flashcard-back"><span class="flashcard-label">Answer</span><span class="flashcard-answer">${escapeHTML(flashcardAnswer(question))}</span><span class="flashcard-explanation">${escapeHTML(question.explanation)}</span><span class="flashcard-source">Source: ${escapeHTML(question.source)}</span><span class="flashcard-hint">Choose whether to review this card again or mark it as known.</span></span>
+    </button>`;
+    document.getElementById('review-flashcard').disabled = true;
+    document.getElementById('know-flashcard').disabled = true;
+    document.getElementById('flip-card').textContent = 'Show answer';
+    document.getElementById('active-flashcard').addEventListener('click', flipFlashcard);
+  }
+
+  function flipFlashcard(){
+    const card = document.getElementById('active-flashcard');
+    if (!card) return;
+    flashcardFlipped = !flashcardFlipped;
+    card.classList.toggle('flipped', flashcardFlipped);
+    card.setAttribute('aria-pressed', flashcardFlipped);
+    card.setAttribute('aria-label', flashcardFlipped ? 'Flip flashcard to show question' : 'Flip flashcard to reveal answer');
+    document.getElementById('flip-card').textContent = flashcardFlipped ? 'Show question' : 'Show answer';
+    document.getElementById('review-flashcard').disabled = !flashcardFlipped;
+    document.getElementById('know-flashcard').disabled = !flashcardFlipped;
+  }
+
+  function markFlashcard(status){
+    const question = currentFlashcard();
+    if (!question || !flashcardFlipped) return;
+    flashState.known = flashState.known.filter(id => id !== question.id);
+    flashState.review = flashState.review.filter(id => id !== question.id);
+    if (status === 'known') flashState.known.push(question.id);
+    if (status === 'review') flashState.review.push(question.id);
+    flashState.index += 1;
+    saveFlashState();
+    renderFlashcard();
+  }
+
+  function restartFlashcards(reviewOnly){
+    const ids = reviewOnly ? [...new Set(flashState.review)] : currentFlashDeck.questions.map(question => question.id);
+    if (!ids.length) { showToast('No cards are marked for review.'); return; }
+    flashState.order = ids;
+    flashState.index = 0;
+    saveFlashState();
+    renderFlashcard();
+  }
+
   function selectCollection(id){
     if (!banks[id]) return;
     persistDraft();
@@ -89,22 +223,27 @@
   }
 
   function showView(name){
-    if (name !== 'library' && !currentBank) name = 'library';
+    const standaloneViews = ['library', 'flashcards', 'flashcard-study'];
+    if (!standaloneViews.includes(name) && !currentBank) name = 'library';
+    if (name === 'flashcard-study' && !currentFlashDeck) name = 'flashcards';
     if (name === 'library' && activeExam) { persistDraft(); activeExam = null; }
+    if (name === 'flashcards' && activeExam) { persistDraft(); activeExam = null; }
     document.querySelectorAll('.view').forEach(view => { view.hidden = true; });
     const target = document.getElementById(`view-${name}`);
     if (target) target.hidden = false;
     document.querySelectorAll('.nav-button').forEach(button => {
-      const active = button.dataset.view === name;
+      const active = button.dataset.view === name || (name === 'flashcard-study' && button.dataset.view === 'flashcards');
       button.classList.toggle('active', active);
       button.toggleAttribute('aria-current', active);
     });
-    const titles = { library:'Exam library', dashboard:currentBank?.title || 'Exam dashboard', history:'Results history', sources:'Source coverage', exam:'Exam in progress', results:'Exam result' };
+    const titles = { library:'Exam library', flashcards:'Flashcards', 'flashcard-study':currentFlashDeck?.title || 'Flashcards', dashboard:currentBank?.title || 'Exam dashboard', history:'Results history', sources:'Source coverage', exam:'Exam in progress', results:'Exam result' };
     document.getElementById('page-title').textContent = titles[name] || 'MicroLab Exam';
-    if (name === 'library') renderLibrary();
-    if (name === 'dashboard') renderDashboard();
-    if (name === 'history') renderHistory();
-    if (name === 'sources') updateCoverage();
+    if (name === 'library') { document.getElementById('side-collection').textContent = 'Choose an exam'; renderLibrary(); }
+    if (name === 'flashcards') { document.getElementById('side-collection').textContent = 'Flashcard library'; renderFlashcardLibrary(); }
+    if (name === 'flashcard-study') { document.getElementById('side-collection').textContent = currentFlashDeck.shortTitle; renderFlashcard(); }
+    if (name === 'dashboard') { document.getElementById('side-collection').textContent = currentBank.shortTitle; renderDashboard(); }
+    if (name === 'history') { document.getElementById('side-collection').textContent = currentBank.shortTitle; renderHistory(); }
+    if (name === 'sources') { document.getElementById('side-collection').textContent = currentBank.shortTitle; updateCoverage(); }
     window.scrollTo({ top:0, behavior:'smooth' });
   }
 
@@ -271,6 +410,15 @@
   document.addEventListener('click', event => {
     const select = event.target.closest('[data-select-bank]');
     if (select) { selectCollection(select.dataset.selectBank); return; }
+    const flashDeck = event.target.closest('[data-select-flash-deck]');
+    if (flashDeck) { selectFlashDeck(flashDeck.dataset.selectFlashDeck); return; }
+    const flashAction = event.target.closest('[data-flash-action]');
+    if (flashAction) {
+      if (flashAction.dataset.flashAction === 'library') showView('flashcards');
+      if (flashAction.dataset.flashAction === 'review') restartFlashcards(true);
+      if (flashAction.dataset.flashAction === 'again') restartFlashcards(false);
+      return;
+    }
     const nav = event.target.closest('[data-view]');
     if (nav) { showView(nav.dataset.view); return; }
     const start = event.target.closest('[data-start-level]');
@@ -278,6 +426,9 @@
   });
   document.getElementById('review-button').addEventListener('click', () => startExam('review'));
   document.getElementById('export-button').addEventListener('click', exportResults);
+  document.getElementById('flip-card').addEventListener('click', flipFlashcard);
+  document.getElementById('review-flashcard').addEventListener('click', () => markFlashcard('review'));
+  document.getElementById('know-flashcard').addEventListener('click', () => markFlashcard('known'));
 
   function registerWebMCP(){
     const context = document.modelContext;

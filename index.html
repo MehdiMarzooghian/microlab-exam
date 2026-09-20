@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102a43">
+  <meta name="description" content="Interactive Lab Microbiology exams with three difficulty levels, progress history, and mistake review.">
+  <title>MicroLab Exam</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23102a43'/%3E%3Cpath d='M25 13h14v7H25zm4 7h7v12c0 8-5 13-13 15h24v6H17v-6c9-2 13-7 13-15z' fill='%23f4a261'/%3E%3Ccircle cx='42' cy='29' r='7' fill='%2359c3c3'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #102a43;
+      --muted: #627d98;
+      --paper: #f4f7fb;
+      --card: #ffffff;
+      --line: #d9e2ec;
+      --soft: #eaf1f7;
+      --navy: #102a43;
+      --navy-2: #173f5f;
+      --teal: #2a9d8f;
+      --teal-soft: #dcf3ef;
+      --orange: #f4a261;
+      --orange-soft: #fff0df;
+      --red: #c84a4a;
+      --red-soft: #fde8e8;
+      --green: #2f855a;
+      --shadow: 0 14px 40px rgba(16, 42, 67, .09);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { font-size: 16px; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid rgba(42, 157, 143, .34);
+      outline-offset: 3px;
+    }
+
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 250px 1fr; }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 28px 20px;
+      color: white;
+      background:
+        radial-gradient(circle at 16% 8%, rgba(89,195,195,.18), transparent 24%),
+        linear-gradient(170deg, #102a43 0%, #0b1f33 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .brand { display: flex; gap: 12px; align-items: center; padding: 0 8px; }
+    .brand-mark {
+      width: 42px; height: 42px; border-radius: 12px; background: var(--orange);
+      display: grid; place-items: center; color: var(--navy); box-shadow: 0 8px 24px rgba(244,162,97,.24);
+    }
+    .brand-mark svg { width: 25px; height: 25px; }
+    .brand strong { display: block; font-size: 1.02rem; letter-spacing: -.01em; }
+    .brand span { color: #9fb3c8; font-size: .78rem; }
+
+    .nav { display: grid; gap: 7px; }
+    .nav-button {
+      width: 100%; border: 0; border-radius: 12px; padding: 12px 13px;
+      color: #bcccdc; background: transparent; display: flex; align-items: center; gap: 11px;
+      text-align: left; font-weight: 650; font-size: .91rem;
+    }
+    .nav-button svg { width: 19px; height: 19px; flex: 0 0 auto; }
+    .nav-button:hover { color: white; background: rgba(255,255,255,.07); }
+    .nav-button.active { color: white; background: rgba(89,195,195,.17); }
+    .side-note {
+      margin-top: auto; border: 1px solid rgba(255,255,255,.11); border-radius: 14px;
+      padding: 14px; background: rgba(255,255,255,.04); color: #bcccdc; font-size: .78rem;
+    }
+    .side-note strong { display: block; color: white; margin-bottom: 5px; font-size: .84rem; }
+
+    .main { min-width: 0; }
+    .topbar {
+      min-height: 82px; padding: 20px clamp(20px, 4vw, 56px); border-bottom: 1px solid var(--line);
+      background: rgba(244,247,251,.9); backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    .eyebrow { margin: 0 0 3px; color: var(--teal); font-size: .76rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .topbar h1 { margin: 0; font-size: clamp(1.25rem, 2.4vw, 1.65rem); letter-spacing: -.03em; }
+    .data-pill { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .8rem; white-space: nowrap; }
+    .data-pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); }
+
+    .content { max-width: 1280px; margin: 0 auto; padding: 34px clamp(20px, 4vw, 56px) 56px; }
+    .view[hidden] { display: none !important; }
+    .library-hero { margin-bottom: 24px; max-width: 820px; }
+    .collection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .collection-card { position: relative; overflow: hidden; display: grid; grid-template-columns: auto 1fr; gap: 18px; padding: 24px; min-height: 210px; cursor: pointer; text-align: left; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+    .collection-card:hover { transform: translateY(-3px); box-shadow: 0 18px 38px rgba(16,42,67,.14); border-color: #9fb3c8; }
+    .collection-card:focus-visible { outline: 3px solid rgba(47,164,153,.35); outline-offset: 3px; }
+    .collection-card::after { content:''; position:absolute; width:150px; height:150px; border-radius:50%; right:-55px; bottom:-65px; background:var(--collection-soft); }
+    .collection-code { position:relative; z-index:1; display:grid; place-items:center; width:76px; height:76px; border-radius:20px; background:var(--collection-color); color:white; font-size:.84rem; font-weight:900; letter-spacing:.03em; box-shadow:0 10px 20px rgba(16,42,67,.14); }
+    .collection-copy { position:relative; z-index:1; }
+    .collection-copy h3 { margin:2px 0 7px; color:var(--navy); font-size:1.24rem; }
+    .collection-copy p { margin:0; color:var(--muted); line-height:1.55; font-size:.88rem; }
+    .collection-meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+    .collection-chip { padding:6px 9px; border-radius:999px; background:#f0f4f8; color:#486581; font-size:.7rem; font-weight:800; }
+    .collection-progress { margin-top:16px; color:var(--teal-dark); font-size:.75rem; font-weight:800; }
+    .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .72fr); gap: 22px; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .panel-pad { padding: clamp(20px, 3vw, 28px); }
+    .section-kicker { margin: 0 0 5px; color: var(--teal); font-weight: 800; font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; }
+    .section-title { margin: 0; font-size: clamp(1.35rem, 3vw, 2rem); letter-spacing: -.035em; }
+    .section-copy { margin: 10px 0 0; color: var(--muted); max-width: 62ch; }
+
+    .level-list { margin-top: 24px; display: grid; gap: 12px; }
+    .level-card {
+      position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 15px;
+      padding: 18px; background: #fff; display: grid; grid-template-columns: 50px 1fr auto; align-items: center; gap: 15px;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .level-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(16,42,67,.08); border-color: #bcccdc; }
+    .level-icon { width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; font-size: 1.05rem; font-weight: 850; }
+    .easy .level-icon { background: var(--teal-soft); color: #177267; }
+    .medium .level-icon { background: var(--orange-soft); color: #a85813; }
+    .hard .level-icon { background: #e9e8ff; color: #5147a5; }
+    .level-copy strong { display: block; font-size: 1rem; }
+    .level-meta { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: .78rem; }
+    .start-button, .primary-button, .secondary-button, .ghost-button {
+      border: 0; border-radius: 11px; font-weight: 750; transition: transform .14s ease, background .14s ease;
+    }
+    .start-button { padding: 10px 15px; color: white; background: var(--navy); }
+    .start-button:hover, .primary-button:hover { transform: translateY(-1px); background: var(--navy-2); }
+    .complete-mark { display: inline-flex; align-items: center; gap: 5px; color: var(--green); font-weight: 750; }
+
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+    .stat { border: 1px solid var(--line); border-radius: 14px; padding: 16px; background: #fbfdff; }
+    .stat-label { color: var(--muted); font-size: .75rem; font-weight: 700; }
+    .stat-value { margin-top: 4px; font-size: 1.55rem; line-height: 1; font-weight: 850; letter-spacing: -.04em; }
+    .ring-wrap { display: grid; place-items: center; padding: 6px 0 18px; }
+    .ring {
+      --progress: 0%; width: 144px; height: 144px; border-radius: 50%;
+      background: conic-gradient(var(--teal) var(--progress), var(--soft) 0);
+      display: grid; place-items: center; position: relative;
+    }
+    .ring::after { content: ""; position: absolute; width: 112px; height: 112px; background: white; border-radius: 50%; }
+    .ring-content { position: relative; z-index: 1; text-align: center; }
+    .ring-content strong { display: block; font-size: 1.7rem; line-height: 1; }
+    .ring-content span { color: var(--muted); font-size: .72rem; }
+    .mini-heading { margin: 0 0 12px; font-size: .88rem; }
+    .progress-row { display: grid; gap: 8px; margin-top: 12px; }
+    .progress-label { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .76rem; }
+    .progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: var(--soft); }
+    .progress-bar { height: 100%; border-radius: inherit; background: var(--teal); transition: width .3s ease; }
+
+    .review-card {
+      grid-column: 1 / -1; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center; gap: 22px; padding: 24px 28px;
+      background: linear-gradient(110deg, #102a43, #153e5c); color: white;
+      border: 0;
+    }
+    .review-card h3 { margin: 0; font-size: 1.22rem; }
+    .review-card p { margin: 6px 0 0; color: #bcccdc; max-width: 64ch; }
+    .lock-row { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .lock-chip { padding: 5px 9px; border-radius: 999px; background: rgba(255,255,255,.08); color: #d9e2ec; font-size: .73rem; font-weight: 700; }
+    .lock-chip.done { color: #bff1e9; background: rgba(42,157,143,.22); }
+    .review-button { border: 0; padding: 12px 18px; border-radius: 12px; font-weight: 800; background: var(--orange); color: var(--navy); min-width: 148px; }
+    .review-button:disabled { cursor: not-allowed; opacity: .48; }
+
+    .view-heading { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 22px; }
+    .history-list { display: grid; gap: 10px; }
+    .history-item { display: grid; grid-template-columns: 1fr auto auto; gap: 20px; align-items: center; padding: 17px 19px; border-bottom: 1px solid var(--line); }
+    .history-item:last-child { border-bottom: 0; }
+    .history-name { font-weight: 800; }
+    .history-date { color: var(--muted); font-size: .78rem; margin-top: 2px; }
+    .score-badge { min-width: 62px; padding: 6px 10px; text-align: center; border-radius: 999px; background: var(--teal-soft); color: #166d62; font-weight: 850; }
+    .history-answers { color: var(--muted); font-size: .8rem; text-align: right; }
+    .empty-state { padding: 48px 24px; text-align: center; color: var(--muted); }
+    .empty-state strong { display: block; color: var(--ink); font-size: 1.05rem; margin-bottom: 5px; }
+
+    .source-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+    .source-metric { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+    .source-metric strong { font-size: 1.45rem; display: block; }
+    .source-metric span { color: var(--muted); font-size: .78rem; }
+    .source-table { width: 100%; border-collapse: collapse; }
+    .source-table th, .source-table td { padding: 15px 18px; border-bottom: 1px solid var(--line); text-align: left; }
+    .source-table th { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+    .source-table td { font-size: .88rem; }
+    .source-table tr:last-child td { border-bottom: 0; }
+    .status-tag { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: .72rem; font-weight: 800; background: var(--orange-soft); color: #955019; }
+    .status-tag.complete { background: var(--teal-soft); color: #166d62; }
+    .coverage-note { margin-top: 18px; padding: 18px; border-left: 4px solid var(--teal); background: var(--teal-soft); border-radius: 0 12px 12px 0; color: #225b56; }
+    .coverage-note strong { display: block; margin-bottom: 4px; }
+
+    .exam-wrap { max-width: 850px; margin: 0 auto; }
+    .exam-toolbar { display: flex; justify-content: space-between; gap: 18px; align-items: center; margin-bottom: 16px; }
+    .exam-level { display: flex; align-items: center; gap: 9px; font-weight: 800; }
+    .level-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--teal); }
+    .question-count { color: var(--muted); font-size: .84rem; }
+    .exam-progress { height: 8px; border-radius: 999px; overflow: hidden; background: #dbe6ef; margin-bottom: 16px; }
+    .exam-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), #59c3c3); transition: width .25s ease; }
+    .question-card { padding: clamp(22px, 4vw, 38px); }
+    .question-type { color: var(--teal); font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 850; }
+    .question-card h2 { margin: 10px 0 22px; font-size: clamp(1.2rem, 3vw, 1.6rem); line-height: 1.32; letter-spacing: -.025em; }
+    .figure-box { margin: 0 0 22px; border: 1px solid var(--line); border-radius: 15px; background: #f8fbfd; padding: 16px; }
+    .figure-box svg, .figure-box img { width: 100%; max-height: 300px; object-fit: contain; display: block; }
+    .figure-box figcaption { margin-top: 8px; color: var(--muted); text-align: center; font-size: .75rem; }
+    .options { display: grid; gap: 10px; }
+    .option {
+      border: 1px solid var(--line); border-radius: 13px; padding: 14px 16px; background: white;
+      display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; text-align: left; color: var(--ink);
+    }
+    .option:hover { border-color: var(--teal); background: #f8fffd; }
+    .option.selected { border-color: var(--teal); background: var(--teal-soft); box-shadow: inset 0 0 0 1px var(--teal); }
+    .option-key { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: var(--soft); font-size: .76rem; font-weight: 850; }
+    .option.selected .option-key { color: white; background: var(--teal); }
+    .short-input { width: 100%; border: 1px solid var(--line); border-radius: 13px; padding: 14px 16px; color: var(--ink); background: white; }
+    .short-input:focus { border-color: var(--teal); }
+    .input-hint { margin: 8px 0 0; color: var(--muted); font-size: .76rem; }
+    .exam-actions { margin-top: 25px; display: flex; justify-content: space-between; gap: 12px; }
+    .primary-button { padding: 12px 20px; color: white; background: var(--navy); }
+    .primary-button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .secondary-button { padding: 11px 17px; color: var(--ink); background: white; border: 1px solid var(--line); }
+    .secondary-button:hover { background: var(--soft); }
+    .ghost-button { padding: 9px 12px; color: var(--muted); background: transparent; }
+    .ghost-button:hover { color: var(--ink); background: var(--soft); }
+
+    .result-hero { text-align: center; padding: 32px 24px 22px; }
+    .result-score { width: 126px; height: 126px; margin: 0 auto 18px; border-radius: 50%; display: grid; place-items: center; color: white; background: var(--navy); box-shadow: 0 14px 34px rgba(16,42,67,.22); }
+    .result-score strong { font-size: 2.1rem; }
+    .result-hero h2 { margin: 0; font-size: 1.6rem; }
+    .result-hero p { margin: 7px auto 0; color: var(--muted); }
+    .result-details { border-top: 1px solid var(--line); }
+    .result-item { padding: 18px 22px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 28px 1fr; gap: 12px; }
+    .result-item:last-child { border-bottom: 0; }
+    .result-icon { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; color: white; font-size: .75rem; font-weight: 900; }
+    .result-item.correct .result-icon { background: var(--green); }
+    .result-item.wrong .result-icon { background: var(--red); }
+    .result-item h4 { margin: 0 0 4px; font-size: .91rem; }
+    .result-answer { color: var(--muted); font-size: .8rem; }
+    .explanation { margin-top: 7px; padding: 9px 11px; border-radius: 9px; color: #3e5368; background: var(--soft); font-size: .8rem; }
+    .result-actions { padding: 20px 22px; border-top: 1px solid var(--line); display: flex; justify-content: center; gap: 10px; }
+
+    .toast { position: fixed; right: 24px; bottom: 24px; max-width: 330px; padding: 13px 16px; border-radius: 12px; color: white; background: var(--navy); box-shadow: var(--shadow); transform: translateY(130%); opacity: 0; transition: .25s ease; z-index: 10; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    @media (max-width: 940px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; padding: 14px 18px; flex-direction: row; align-items: center; gap: 12px; }
+      .brand span, .side-note { display: none; }
+      .brand { padding: 0; }
+      .nav { margin-left: auto; display: flex; }
+      .nav-button { width: auto; padding: 10px; }
+      .nav-button span { display: none; }
+      .dashboard-grid, .collection-grid { grid-template-columns: 1fr; }
+      .review-card { grid-column: auto; }
+    }
+    @media (max-width: 640px) {
+      .topbar { min-height: 70px; padding: 16px 18px; }
+      .data-pill { display: none; }
+      .content { padding: 22px 14px 40px; }
+      .sidebar { overflow-x: auto; }
+      .brand strong { font-size: .9rem; }
+      .nav-button { flex: 0 0 auto; }
+      .level-card { grid-template-columns: 44px 1fr; }
+      .level-icon { width: 44px; height: 44px; }
+      .start-button { grid-column: 1 / -1; width: 100%; }
+      .review-card { grid-template-columns: 1fr; padding: 22px; }
+      .review-button { width: 100%; }
+      .source-summary { grid-template-columns: 1fr; }
+      .source-table thead { display: none; }
+      .source-table tr, .source-table td { display: block; }
+      .source-table tr { padding: 12px 15px; border-bottom: 1px solid var(--line); }
+      .source-table td { border: 0; padding: 4px 0; }
+      .history-item { grid-template-columns: 1fr auto; gap: 10px; }
+      .history-answers { grid-column: 1 / -1; text-align: left; }
+      .collection-card { grid-template-columns: 1fr; min-height:0; }
+      .view-heading { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3h8M9 6h6v5a7 7 0 0 1-7 7H5m4-3 6 6M4 21h16"/></svg>
+        </div>
+        <div><strong>MicroLab Exam</strong><span>Lab Microbiology</span></div>
+      </div>
+      <nav class="nav">
+        <button class="nav-button active" data-view="library" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a3 3 0 0 1 3-3h13v17H7a3 3 0 0 0-3 3z"/><path d="M4 5v17M8 6h8M8 10h8"/></svg><span>Exam library</span>
+        </button>
+        <button class="nav-button" data-view="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Exam dashboard</span>
+        </button>
+        <button class="nav-button" data-view="history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Results history</span>
+        </button>
+        <button class="nav-button" data-view="sources">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a3 3 0 0 1 3-3h13v17H7a3 3 0 0 0-3 3z"/><path d="M4 5v17M8 6h8M8 10h8"/></svg><span>Source coverage</span>
+        </button>
+      </nav>
+      <div class="side-note"><strong id="side-collection">Choose an exam</strong>Your attempts and mistakes stay saved separately for each exam collection.</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow">Lab Microbiology</p><h1 id="page-title">Exam library</h1></div>
+        <div class="data-pill">Progress saved automatically</div>
+      </header>
+
+      <div class="content">
+        <section class="view" id="view-library">
+          <div class="library-hero">
+            <p class="section-kicker">Choose your course set</p>
+            <h2 class="section-title">Practice one lesson pair or take the complete exam.</h2>
+            <p class="section-copy">Every collection keeps its own Easy, Medium, Hard, history, and Mistake Review progress. The Study Guide collection is limited to the teacher-provided exam objectives.</p>
+          </div>
+          <div class="collection-grid" id="collection-grid"></div>
+        </section>
+
+        <section class="view" id="view-dashboard" hidden>
+          <div class="dashboard-grid">
+            <div class="panel panel-pad">
+              <p class="section-kicker" id="dashboard-collection">Choose your level</p>
+              <h2 class="section-title">Build confidence, one culture at a time.</h2>
+              <p class="section-copy" id="dashboard-copy">Complete all three levels to unlock a focused exam made only from questions you previously answered incorrectly.</p>
+              <div class="level-list" id="level-list"></div>
+            </div>
+
+            <aside class="panel panel-pad" aria-label="Progress summary">
+              <div class="stat-grid">
+                <div class="stat"><div class="stat-label">Attempts</div><div class="stat-value" id="attempts-stat">0</div></div>
+                <div class="stat"><div class="stat-label">Saved mistakes</div><div class="stat-value" id="mistakes-stat">0</div></div>
+              </div>
+              <div class="ring-wrap">
+                <div class="ring" id="progress-ring"><div class="ring-content"><strong id="levels-stat">0/3</strong><span>levels completed</span></div></div>
+              </div>
+              <h3 class="mini-heading">Best scores</h3>
+              <div id="best-scores"></div>
+            </aside>
+
+            <section class="panel review-card" aria-labelledby="review-title">
+              <div>
+                <h3 id="review-title">Mistake Review Exam</h3>
+                <p id="review-copy">Complete Easy, Medium, and Hard once to unlock this exam.</p>
+                <div class="lock-row" id="lock-row"></div>
+              </div>
+              <button class="review-button" id="review-button" disabled>Locked</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-history" hidden>
+          <div class="view-heading">
+            <div><p class="section-kicker">Every attempt</p><h2 class="section-title">Results history</h2><p class="section-copy">Scores, dates, and incorrect-answer counts are stored for every completed exam.</p></div>
+            <button class="secondary-button" id="export-button">Export results</button>
+          </div>
+          <div class="panel history-list" id="history-list"></div>
+        </section>
+
+        <section class="view" id="view-sources" hidden>
+          <div class="view-heading">
+            <div><p class="section-kicker">Traceable question bank</p><h2 class="section-title">Source coverage</h2><p class="section-copy" id="coverage-copy">Every question is mapped to a reviewed course source.</p></div>
+          </div>
+          <div class="source-summary">
+            <div class="source-metric"><strong id="bank-size">78</strong><span>course questions</span></div>
+            <div class="source-metric"><strong id="topic-count">—</strong><span>topic tags</span></div>
+            <div class="source-metric"><strong id="source-count">—</strong><span>source files reviewed</span></div>
+          </div>
+          <div class="panel">
+            <table class="source-table">
+              <thead><tr><th>Source</th><th>Coverage</th><th>Question mapping</th><th>Status</th></tr></thead>
+              <tbody id="source-table-body"></tbody>
+            </table>
+          </div>
+          <div class="coverage-note"><strong>Coverage method</strong>The bank includes direct recall, procedure selection, experimental interpretation, safety scenarios, and figure-based identification. Every result explanation displays its source locator for review.</div>
+        </section>
+
+        <section class="view exam-wrap" id="view-exam" hidden>
+          <div class="exam-toolbar"><div class="exam-level"><span class="level-dot"></span><span id="exam-level-label">Easy exam</span></div><div class="question-count" id="question-count">Question 1 of 3</div></div>
+          <div class="exam-progress"><span id="exam-progress-bar"></span></div>
+          <article class="panel question-card" id="question-card"></article>
+        </section>
+
+        <section class="view exam-wrap" id="view-results" hidden>
+          <div class="panel" id="result-panel"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="question-bank.js"></script>
+  <script src="question-bank-34.js"></script>
+  <script src="question-bank-56.js"></script>
+  <script src="study-guide-bank.js"></script>
+  <script src="exam-banks.js"></script>
+  <script type="text/plain" id="legacy-single-bank-app">
+    const STORAGE_KEY = 'microlab-exam-v2';
+    const levels = {
+      easy: { label: 'Easy', code: '01', note: 'Core terms & lab safety', time: '3 questions' },
+      medium: { label: 'Medium', code: '02', note: 'Tests & interpretation', time: '3 questions' },
+      hard: { label: 'Hard', code: '03', note: 'Calculations & quality control', time: '3 questions' }
+    };
+
+    const streakFigure = `
+      <figure class="figure-box">
+        <svg viewBox="0 0 520 210" role="img" aria-labelledby="streak-title streak-desc">
+          <title id="streak-title">Four-quadrant agar plate diagram</title><desc id="streak-desc">A circular agar plate divided into four streaked sectors with fewer colonies in each successive sector.</desc>
+          <circle cx="260" cy="102" r="88" fill="#fce5bd" stroke="#c58a48" stroke-width="5"/>
+          <path d="M260 14v176M172 102h176" stroke="#d9aa6d" stroke-width="2" stroke-dasharray="7 7"/>
+          <path d="M195 45c43 10 71 25 110 52M191 59c38 9 71 24 107 47M186 74c36 7 65 20 96 37" fill="none" stroke="#915c33" stroke-width="3" stroke-linecap="round"/>
+          <g fill="#7b3f24"><circle cx="207" cy="40" r="5"/><circle cx="226" cy="53" r="4"/><circle cx="247" cy="60" r="5"/><circle cx="270" cy="70" r="4"/><circle cx="289" cy="84" r="4"/></g>
+          <path d="M323 114c-31 15-49 31-62 66M336 124c-29 14-44 30-52 55" fill="none" stroke="#915c33" stroke-width="3" stroke-linecap="round"/>
+          <g fill="#7b3f24"><circle cx="327" cy="129" r="4"/><circle cx="307" cy="143" r="3"/><circle cx="288" cy="161" r="3"/></g>
+          <text x="150" y="30" fill="#627d98" font-size="16" font-weight="700">I</text><text x="355" y="30" fill="#627d98" font-size="16" font-weight="700">II</text><text x="355" y="192" fill="#627d98" font-size="16" font-weight="700">III</text><text x="150" y="192" fill="#627d98" font-size="16" font-weight="700">IV</text>
+        </svg><figcaption>Schematic agar plate from the demonstration bank</figcaption>
+      </figure>`;
+
+    const cocciFigure = `
+      <figure class="figure-box">
+        <svg viewBox="0 0 520 210" role="img" aria-labelledby="cocci-title cocci-desc">
+          <title id="cocci-title">Microscope field with clustered cocci</title><desc id="cocci-desc">Purple spherical cells arranged in irregular grape-like clusters on a pale field.</desc>
+          <rect x="8" y="8" width="504" height="194" rx="96" fill="#f3eef8" stroke="#d2c5df" stroke-width="4"/>
+          <g fill="#725493" stroke="#4c3569" stroke-width="2">
+            <circle cx="224" cy="77" r="15"/><circle cx="251" cy="66" r="14"/><circle cx="277" cy="82" r="15"/><circle cx="242" cy="94" r="15"/><circle cx="268" cy="107" r="15"/><circle cx="215" cy="108" r="14"/><circle cx="244" cy="122" r="14"/><circle cx="291" cy="112" r="13"/>
+            <circle cx="343" cy="65" r="10"/><circle cx="365" cy="78" r="10"/><circle cx="348" cy="91" r="10"/>
+            <circle cx="147" cy="133" r="11"/><circle cx="169" cy="128" r="11"/><circle cx="160" cy="149" r="10"/>
+          </g>
+        </svg><figcaption>Schematic Gram-stained field · 1000×</figcaption>
+      </figure>`;
+
+    const zoneFigure = `
+      <figure class="figure-box">
+        <svg viewBox="0 0 520 220" role="img" aria-labelledby="zone-title zone-desc">
+          <title id="zone-title">Disk diffusion zone measurement</title><desc id="zone-desc">An antibiotic disk centered within a circular clear zone, measured from edge to edge as 24 millimeters.</desc>
+          <circle cx="260" cy="108" r="94" fill="#d7e5b7" stroke="#91aa65" stroke-width="5"/>
+          <circle cx="260" cy="108" r="55" fill="#f8f6df" stroke="#b2b08c" stroke-width="3" stroke-dasharray="5 4"/>
+          <circle cx="260" cy="108" r="14" fill="white" stroke="#9a9677" stroke-width="3"/>
+          <line x1="205" y1="108" x2="315" y2="108" stroke="#c84a4a" stroke-width="4"/>
+          <path d="M205 99v18M315 99v18" stroke="#c84a4a" stroke-width="4"/>
+          <rect x="229" y="150" width="62" height="27" rx="8" fill="#fff" stroke="#d9e2ec"/><text x="260" y="169" fill="#102a43" font-size="16" font-weight="800" text-anchor="middle">24 mm</text>
+        </svg><figcaption>Zone of inhibition measured edge to edge</figcaption>
+      </figure>`;
+
+    const legacyDemoQuestions = [
+      { id:'E-001', level:'easy', type:'mcq', topic:'Gram staining', source:'Demo · Unit 1', prompt:'After a correctly performed Gram stain, what color do Gram-positive cells appear?', options:['Pink','Purple','Green','Colorless'], answer:'Purple', explanation:'The thick peptidoglycan layer retains the crystal violet–iodine complex, so Gram-positive cells appear purple.' },
+      { id:'E-002', level:'easy', type:'short', topic:'Isolation technique', source:'Demo · Unit 2 · Figure 1', prompt:'Name the isolation method shown in the figure.', figure:streakFigure, answers:['quadrant streak','four quadrant streak','streak plate','quadrant streak plate'], displayAnswer:'Quadrant streak plate', explanation:'Successive streaking across four sectors dilutes the inoculum and produces isolated colonies.' },
+      { id:'E-003', level:'easy', type:'mcq', topic:'Aseptic technique', source:'Demo · Unit 2', prompt:'What is the primary purpose of aseptic technique during culture transfer?', options:['Increase incubation temperature','Prevent contamination of the culture and environment','Make cells stain darker','Accelerate colony growth'], answer:'Prevent contamination of the culture and environment', explanation:'Aseptic technique protects the specimen, worker, and surrounding environment from unwanted microbial transfer.' },
+      { id:'M-001', level:'medium', type:'mcq', topic:'Biochemical tests', source:'Demo · Unit 3', prompt:'Immediate bubbling after hydrogen peroxide is added to a colony indicates a positive result for which test?', options:['Oxidase','Coagulase','Catalase','Indole'], answer:'Catalase', explanation:'Catalase breaks hydrogen peroxide into water and oxygen; the released oxygen produces visible bubbles.' },
+      { id:'M-002', level:'medium', type:'short', topic:'Microscopy', source:'Demo · Unit 1 · Figure 2', prompt:'Describe the cellular arrangement shown in the microscope field.', figure:cocciFigure, answers:['cocci in clusters','cocci clusters','clustered cocci','grape like clusters','grape-like clusters'], displayAnswer:'Cocci in clusters', explanation:'The cells are spherical (cocci) and form irregular, grape-like clusters.' },
+      { id:'M-003', level:'medium', type:'mcq', topic:'Gram staining', source:'Demo · Unit 1', prompt:'Which reagent acts as the decolorizer in the standard Gram-stain procedure?', options:['Crystal violet','Gram iodine','Alcohol or acetone-alcohol','Safranin'], answer:'Alcohol or acetone-alcohol', explanation:'Alcohol or acetone-alcohol removes the primary stain complex from Gram-negative cells before counterstaining.' },
+      { id:'H-001', level:'hard', type:'mcq', topic:'Quantitative culture', source:'Demo · Unit 4', prompt:'A 0.1 mL sample from a 10⁻⁵ dilution yields 86 colonies. What is the original concentration?', options:['8.6 × 10⁵ CFU/mL','8.6 × 10⁶ CFU/mL','8.6 × 10⁷ CFU/mL','8.6 × 10⁸ CFU/mL'], answer:'8.6 × 10⁷ CFU/mL', explanation:'CFU/mL = colonies ÷ (dilution × volume plated) = 86 ÷ (10⁻⁵ × 0.1) = 8.6 × 10⁷.' },
+      { id:'H-002', level:'hard', type:'short', topic:'Antimicrobial susceptibility', source:'Demo · Unit 5 · Figure 3', prompt:'What is the measured diameter of the zone of inhibition shown?', figure:zoneFigure, answers:['24 mm','24mm','24'], displayAnswer:'24 mm', explanation:'Disk-diffusion zones are measured across the full diameter, edge to edge, in millimeters.' },
+      { id:'H-003', level:'hard', type:'mcq', topic:'Quality control', source:'Demo · Unit 6', prompt:'A sterility-control tube becomes turbid while all test cultures are incubating. What is the best interpretation?', options:['All negative tests are valid','The batch may be contaminated and results require investigation','The medium is confirmed sterile','Incubation should continue without action'], answer:'The batch may be contaminated and results require investigation', explanation:'Growth in the sterility control signals possible medium or process contamination, so the affected run cannot be accepted without investigation.' }
+    ];
+    const questions = window.MICROLAB_QUESTIONS;
+
+    let state = loadState();
+    let activeExam = null;
+    let toastTimer = null;
+
+    function initialState(){ return { version:2, history:[], mistakes:[], completed:{easy:false,medium:false,hard:false} }; }
+    function loadState(){
+      try {
+        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (!parsed || parsed.version !== 2) return initialState();
+        return { ...initialState(), ...parsed, completed:{...initialState().completed, ...(parsed.completed || {})} };
+      } catch { return initialState(); }
+    }
+    function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    function escapeHTML(value){ return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char])); }
+    function normalize(value){ return String(value).toLowerCase().trim().replace(/[–—]/g,'-').replace(/\s+/g,' ').replace(/[^a-z0-9×^⁻. -]/g,''); }
+    function isCorrect(question, response){
+      if (question.type === 'mcq') return response === question.answer;
+      const given = normalize(response);
+      return question.answers.some(answer => normalize(answer) === given);
+    }
+    function showToast(message){
+      const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
+    function showView(name){
+      document.querySelectorAll('.view').forEach(view => view.hidden = true);
+      document.getElementById(`view-${name}`).hidden = false;
+      document.querySelectorAll('.nav-button').forEach(button => {
+        const active = button.dataset.view === name || (name === 'results' && false);
+        button.classList.toggle('active', active); button.toggleAttribute('aria-current', active);
+      });
+      const titles = { dashboard:'Exam dashboard', history:'Results history', sources:'Source coverage', exam:'Exam in progress', results:'Exam result' };
+      document.getElementById('page-title').textContent = titles[name] || 'MicroLab Exam';
+      if (name === 'dashboard') renderDashboard();
+      if (name === 'history') renderHistory();
+      if (name === 'sources') window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function renderDashboard(){
+      const completedCount = Object.values(state.completed).filter(Boolean).length;
+      const uniqueMistakes = [...new Set(state.mistakes.map(item => item.questionId))];
+      document.getElementById('attempts-stat').textContent = state.history.length;
+      document.getElementById('mistakes-stat').textContent = uniqueMistakes.length;
+      document.getElementById('levels-stat').textContent = `${completedCount}/3`;
+      document.getElementById('progress-ring').style.setProperty('--progress', `${completedCount / 3 * 100}%`);
+
+      document.getElementById('level-list').innerHTML = Object.entries(levels).map(([key, level]) => {
+        const completed = state.completed[key];
+        return `<article class="level-card ${key}">
+          <div class="level-icon">${level.code}</div>
+          <div class="level-copy"><strong>${level.label}</strong><div class="level-meta"><span>${level.note}</span><span>${questions.filter(question => question.level === key).length} questions</span>${completed ? '<span class="complete-mark">✓ Completed</span>' : ''}</div></div>
+          <button class="start-button" data-start-level="${key}">${completed ? 'Retake' : 'Start exam'}</button>
+        </article>`;
+      }).join('');
+
+      document.getElementById('best-scores').innerHTML = Object.keys(levels).map(key => {
+        const tries = state.history.filter(item => item.level === key);
+        const best = tries.length ? Math.max(...tries.map(item => item.score)) : 0;
+        return `<div class="progress-row"><div class="progress-label"><span>${levels[key].label}</span><strong>${tries.length ? best + '%' : 'Not attempted'}</strong></div><div class="progress-track"><div class="progress-bar" style="width:${best}%"></div></div></div>`;
+      }).join('');
+
+      document.getElementById('lock-row').innerHTML = Object.keys(levels).map(key => `<span class="lock-chip ${state.completed[key] ? 'done' : ''}">${state.completed[key] ? '✓' : '○'} ${levels[key].label}</span>`).join('');
+      const unlocked = completedCount === 3;
+      const reviewButton = document.getElementById('review-button');
+      reviewButton.disabled = !unlocked || uniqueMistakes.length === 0;
+      reviewButton.textContent = !unlocked ? 'Locked' : uniqueMistakes.length ? `Review ${uniqueMistakes.length} mistake${uniqueMistakes.length === 1 ? '' : 's'}` : 'No mistakes yet';
+      document.getElementById('review-copy').textContent = !unlocked
+        ? 'Complete Easy, Medium, and Hard once to unlock this exam.'
+        : uniqueMistakes.length
+          ? 'Unlocked. This exam uses only unique questions missed in earlier attempts.'
+          : 'Unlocked. Finish an exam with an incorrect answer to create a review set.';
+    }
+
+    function startExam(level){
+      const pool = level === 'review'
+        ? [...new Set(state.mistakes.map(item => item.questionId))].map(id => questions.find(q => q.id === id)).filter(Boolean)
+        : questions.filter(q => q.level === level);
+      if (!pool.length) { showToast('There are no saved mistakes to review yet.'); return; }
+      activeExam = { level, questions:pool, index:0, responses:{}, startedAt:new Date().toISOString() };
+      showView('exam'); renderQuestion();
+    }
+
+    function renderQuestion(){
+      const question = activeExam.questions[activeExam.index];
+      const total = activeExam.questions.length;
+      const saved = activeExam.responses[question.id] || '';
+      document.getElementById('exam-level-label').textContent = activeExam.level === 'review' ? 'Mistake Review Exam' : `${levels[activeExam.level].label} exam`;
+      document.getElementById('question-count').textContent = `Question ${activeExam.index + 1} of ${total}`;
+      document.getElementById('exam-progress-bar').style.width = `${(activeExam.index + 1) / total * 100}%`;
+      const input = question.type === 'mcq'
+        ? `<div class="options" role="radiogroup" aria-label="Answer choices">${question.options.map((option, i) => `<button class="option ${saved === option ? 'selected' : ''}" role="radio" aria-checked="${saved === option}" data-option="${escapeHTML(option)}"><span class="option-key">${String.fromCharCode(65+i)}</span><span>${escapeHTML(option)}</span></button>`).join('')}</div>`
+        : `<label for="short-answer" class="question-type">Your short answer</label><input class="short-input" id="short-answer" autocomplete="off" value="${escapeHTML(saved)}" placeholder="Type the finding or term"><p class="input-hint">Capitalization does not matter. Use the most specific laboratory term you know.</p>`;
+      document.getElementById('question-card').innerHTML = `
+        <div class="question-type">${question.type === 'mcq' ? 'Multiple choice' : 'Figure-based short answer'} · ${escapeHTML(question.topic)}</div>
+        <h2>${escapeHTML(question.prompt)}</h2>${question.figure || ''}${input}
+        <div class="exam-actions"><button class="ghost-button" id="exit-exam">Save & exit</button><button class="primary-button" id="next-question" ${saved ? '' : 'disabled'}>${activeExam.index === total - 1 ? 'Finish exam' : 'Next question'}</button></div>`;
+      document.getElementById('exit-exam').addEventListener('click', () => { activeExam = null; showView('dashboard'); showToast('Exam closed. Completed attempts are saved.'); });
+      const next = document.getElementById('next-question');
+      if (question.type === 'mcq') {
+        document.querySelectorAll('[data-option]').forEach(button => button.addEventListener('click', () => {
+          activeExam.responses[question.id] = button.dataset.option;
+          document.querySelectorAll('[data-option]').forEach(item => { item.classList.toggle('selected', item === button); item.setAttribute('aria-checked', item === button); });
+          next.disabled = false;
+        }));
+      } else {
+        const answer = document.getElementById('short-answer'); answer.focus();
+        answer.addEventListener('input', () => { activeExam.responses[question.id] = answer.value; next.disabled = !answer.value.trim(); });
+        answer.addEventListener('keydown', event => { if (event.key === 'Enter' && answer.value.trim()) advanceExam(); });
+      }
+      next.addEventListener('click', advanceExam);
+    }
+
+    function advanceExam(){
+      if (activeExam.index < activeExam.questions.length - 1) { activeExam.index += 1; renderQuestion(); window.scrollTo({top:0, behavior:'smooth'}); }
+      else finishExam();
+    }
+
+    function finishExam(){
+      const exam = activeExam;
+      const graded = exam.questions.map(question => {
+        const response = exam.responses[question.id] || '';
+        return { questionId:question.id, response, correct:isCorrect(question, response) };
+      });
+      const correctCount = graded.filter(item => item.correct).length;
+      const score = Math.round(correctCount / graded.length * 100);
+      const attemptId = `attempt-${Date.now()}`;
+      graded.filter(item => !item.correct).forEach(item => state.mistakes.push({ questionId:item.questionId, attemptId, response:item.response, date:new Date().toISOString() }));
+      state.history.unshift({ id:attemptId, level:exam.level, score, correctCount, total:graded.length, answers:graded, date:new Date().toISOString() });
+      if (exam.level !== 'review') state.completed[exam.level] = true;
+      saveState(); activeExam = null; renderResults(exam, graded, score, correctCount); showView('results');
+    }
+
+    function renderResults(exam, graded, score, correctCount){
+      const title = score === 100 ? 'Excellent work.' : score >= 70 ? 'Solid result.' : 'Your review set is growing.';
+      const details = graded.map(item => {
+        const q = questions.find(question => question.id === item.questionId);
+        const rightAnswer = q.type === 'mcq' ? q.answer : q.displayAnswer;
+        return `<div class="result-item ${item.correct ? 'correct' : 'wrong'}"><div class="result-icon">${item.correct ? '✓' : '×'}</div><div><h4>${escapeHTML(q.prompt)}</h4><div class="result-answer">Your answer: <strong>${escapeHTML(item.response || 'No answer')}</strong>${item.correct ? '' : ` · Correct answer: <strong>${escapeHTML(rightAnswer)}</strong>`}</div><div class="explanation">${escapeHTML(q.explanation)} <span aria-hidden="true">·</span> ${escapeHTML(q.source)}</div></div></div>`;
+      }).join('');
+      document.getElementById('result-panel').innerHTML = `<div class="result-hero"><div class="result-score"><strong>${score}%</strong></div><h2>${title}</h2><p>${correctCount} of ${graded.length} correct · ${graded.length - correctCount} saved to mistake history</p></div><div class="result-details">${details}</div><div class="result-actions"><button class="secondary-button" id="view-history-result">View history</button><button class="primary-button" id="back-dashboard">Back to dashboard</button></div>`;
+      document.getElementById('view-history-result').addEventListener('click', () => showView('history'));
+      document.getElementById('back-dashboard').addEventListener('click', () => showView('dashboard'));
+    }
+
+    function renderHistory(){
+      const list = document.getElementById('history-list');
+      if (!state.history.length) { list.innerHTML = '<div class="empty-state"><strong>No completed exams yet</strong>Your first result will appear here after you finish an exam.</div>'; return; }
+      list.innerHTML = state.history.map(item => {
+        const label = item.level === 'review' ? 'Mistake Review' : `${levels[item.level]?.label || item.level} Exam`;
+        const date = new Intl.DateTimeFormat(undefined, {dateStyle:'medium', timeStyle:'short'}).format(new Date(item.date));
+        return `<article class="history-item"><div><div class="history-name">${escapeHTML(label)}</div><div class="history-date">${escapeHTML(date)}</div></div><div class="score-badge">${item.score}%</div><div class="history-answers">${item.correctCount}/${item.total} correct · ${item.total - item.correctCount} incorrect</div></article>`;
+      }).join('');
+    }
+
+    function exportResults(){
+      if (!state.history.length) { showToast('Complete an exam before exporting results.'); return; }
+      const payload = { exportedAt:new Date().toISOString(), app:'MicroLab Exam', results:state.history, mistakeHistory:state.mistakes };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'microlab-exam-results.json'; link.click(); URL.revokeObjectURL(url);
+      showToast('Results exported.');
+    }
+
+    document.addEventListener('click', event => {
+      const nav = event.target.closest('[data-view]'); if (nav) showView(nav.dataset.view);
+      const start = event.target.closest('[data-start-level]'); if (start) startExam(start.dataset.startLevel);
+    });
+    document.getElementById('review-button').addEventListener('click', () => startExam('review'));
+    document.getElementById('export-button').addEventListener('click', exportResults);
+
+    function registerWebMCP(){
+      const context = document.modelContext; if (!context?.registerTool) return;
+      const tool = {
+        name:'read_exam_progress', title:'Read exam progress',
+        description:'Read completed levels, attempt count, best scores, and the number of unique saved mistakes.',
+        inputSchema:{type:'object',properties:{},additionalProperties:false}, annotations:{readOnlyHint:true,untrustedContentHint:false},
+        execute(){
+          const bestScores = Object.fromEntries(Object.keys(levels).map(level => [level, Math.max(0, ...state.history.filter(item => item.level === level).map(item => item.score))]));
+          return {completedLevels:Object.keys(levels).filter(level => state.completed[level]), attempts:state.history.length, uniqueMistakes:new Set(state.mistakes.map(item => item.questionId)).size, bestScores};
+        }
+      };
+      try { void Promise.resolve(context.registerTool(tool)).catch(() => {}); } catch {}
+    }
+
+    document.getElementById('bank-size').textContent = questions.length;
+    document.getElementById('topic-count').textContent = new Set(questions.map(question => question.topic)).size;
+    renderDashboard(); registerWebMCP();
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

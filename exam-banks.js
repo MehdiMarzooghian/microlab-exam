@@ -4,12 +4,26 @@
     const match = String(question.source || '').match(/(?:Module|LM)\s*0?([1-6])/i);
     return match ? Number(match[1]) : null;
   };
-  const withModules = (questions) => questions.map((question) => ({ ...question, module:detectModule(question) }));
+  const prepareQuestions = (questions) => {
+    const answerPositions = {};
+    const levelOffsets = { easy:0, medium:1, hard:2 };
+    return questions.map((question) => {
+      const prepared = { ...question, module:detectModule(question) };
+      if (question.type !== 'mcq' || !Array.isArray(question.options)) return prepared;
+      const group = question.level || 'all';
+      const position = ((answerPositions[group] || 0) + (levelOffsets[group] || 0)) % question.options.length;
+      answerPositions[group] = (answerPositions[group] || 0) + 1;
+      const distractors = question.options.filter(option => option !== question.answer);
+      const options = [...distractors];
+      options.splice(position, 0, question.answer);
+      return { ...prepared, options };
+    });
+  };
 
-  const lessons12 = withModules(window.MICROLAB_QUESTIONS);
-  const lessons34 = withModules(window.MICROLAB_QUESTIONS_34);
-  const lessons56 = withModules(window.MICROLAB_QUESTIONS_56);
-  const studyGuide = withModules(window.MICROLAB_STUDY_GUIDE_QUESTIONS);
+  const lessons12 = prepareQuestions(window.MICROLAB_QUESTIONS);
+  const lessons34 = prepareQuestions(window.MICROLAB_QUESTIONS_34);
+  const lessons56 = prepareQuestions(window.MICROLAB_QUESTIONS_56);
+  const studyGuide = prepareQuestions(window.MICROLAB_STUDY_GUIDE_QUESTIONS);
   const allCourseQuestions = [...lessons12, ...lessons34, ...lessons56];
 
   const finalQuestions = [];
@@ -23,6 +37,7 @@
       }));
     }
   }
+  const balancedFinalQuestions = prepareQuestions(finalQuestions);
 
   window.MICROLAB_BANKS = {
     lessons12: {
@@ -71,7 +86,7 @@
     finalExam: {
       id:'finalExam', title:'Final Exam', shortTitle:'Final Exam', code:'01–06', accent:'navy',
       description:'A balanced cumulative exam combining all six laboratory modules.',
-      questions:finalQuestions, sourceCount:16,
+      questions:balancedFinalQuestions, sourceCount:16,
       coverage:[
         ['Modules 01–06 course bank','Three questions per module at every difficulty','Balanced cumulative sampling across all six modules'],
         ['Course PDFs, slides, notes, and figures','All reviewed source sets included','Safety through specialized structures and motility']
